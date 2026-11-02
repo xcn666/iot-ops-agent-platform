@@ -1,0 +1,20 @@
+# 密钥与本地配置
+config.py
+.env
+
+# RAG 索引(可本地重建)
+rag_index.json
+
+# Python 缓存
+__pycache__/
+*.pyc
+
+# Agent runtime data and evaluation output
+data/*.db
+data/*.db-*
+eval/results*.json
+
+# local virtual environments
+.venv/
+venv/
+eval/rag_results.json

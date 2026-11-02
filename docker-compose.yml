@@ -1,0 +1,87 @@
+services:
+  mqtt:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:1883:1883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto-data:/mosquitto/data
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -h 127.0.0.1 -t '$$SYS/#' -C 1 -W 5 >/dev/null"]
+      interval: 5s
+      timeout: 7s
+      retries: 12
+
+  monitor-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.monitor
+    restart: unless-stopped
+    command: ["python", "dashboard.py"]
+    environment:
+      IOT_DB_PATH: /data/sensor.db
+      IOT_MQTT_BROKER: mqtt
+      IOT_MQTT_PORT: "1883"
+      IOT_MQTT_TOPIC: iot/#
+      IOT_DASHBOARD_PORT: "5000"
+    ports:
+      - "127.0.0.1:5000:5000"
+    volumes:
+      - monitor-data:/data
+    depends_on:
+      mqtt:
+        condition: service_healthy
+
+  monitor-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.monitor
+    restart: unless-stopped
+    command: ["python", "agent_api.py"]
+    environment:
+      IOT_DB_PATH: /data/sensor.db
+      IOT_MONITOR_API_TOKEN: ${IOT_MONITOR_API_TOKEN:?Set IOT_MONITOR_API_TOKEN in .env}
+      IOT_MONITOR_API_PORT: "5002"
+    ports:
+      - "127.0.0.1:5002:5002"
+    volumes:
+      - monitor-data:/data
+
+  agent:
+    build: ./agent
+    restart: unless-stopped
+    environment:
+      GLM_API_KEY: ${GLM_API_KEY:?Set GLM_API_KEY in .env}
+      GLM_API_URL: ${GLM_API_URL:-https://open.bigmodel.cn/api/paas/v4/chat/completions}
+      GLM_MODEL: ${GLM_MODEL:-glm-4-flash}
+      IOT_AGENT_DB: /app/data/agent.db
+      IOT_RAG_INDEX: /app/rag_index.json
+      IOT_NOTIFY_CONFIG: /app/data/notify_config.json
+      IOT_MONITOR_API_URL: http://monitor-api:5002
+      IOT_MONITOR_API_TOKEN: ${IOT_MONITOR_API_TOKEN:?Set IOT_MONITOR_API_TOKEN in .env}
+    ports:
+      - "127.0.0.1:5001:5001"
+    volumes:
+      - agent-data:/app/data
+    depends_on:
+      - monitor-api
+
+  sensor-simulator:
+    build:
+      context: .
+      dockerfile: Dockerfile.monitor
+    restart: unless-stopped
+    command: ["python", "sensor_publisher.py", "3600", "1"]
+    environment:
+      IOT_MQTT_BROKER: mqtt
+      IOT_MQTT_PORT: "1883"
+      IOT_MQTT_PUBLISH_TOPIC: iot/xcn666/sensor
+    depends_on:
+      mqtt:
+        condition: service_healthy
+
+volumes:
+  agent-data:
+  monitor-data:
+  mosquitto-data:

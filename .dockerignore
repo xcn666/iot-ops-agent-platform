@@ -1,0 +1,14 @@
+.git
+.github
+.env
+**/.env
+**/config.py
+**/.venv
+**/venv
+**/__pycache__
+**/*.pyc
+**/*.db
+**/*.log
+data
+agent/data
+monitor/logs
